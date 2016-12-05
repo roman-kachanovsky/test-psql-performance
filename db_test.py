@@ -22,14 +22,14 @@ def now_str():
     return datetime.now().strftime('%Y-%m-%d / %H:%M:%S')
 
 
+test_started_at = datetime.now()
+
+print '[{}] Create temporary {} database on {}'.format(now_str(), DB_NAME, DB_HOST)
+
+call('export PGPASSWORD={}'.format(DB_PASSWORD), shell=True)
+call('createdb -h {} -U{} {}'.format(DB_HOST, DB_USER, DB_NAME), shell=True)
+
 try:
-    test_started_at = datetime.now()
-
-    print '[{}] Create temporary {} database on {}'.format(now_str(), DB_NAME, DB_HOST)
-
-    call('export PGPASSWORD={}'.format(DB_PASSWORD), shell=True)
-    call('createdb -h {} -U{} {}'.format(DB_HOST, DB_USER, DB_NAME), shell=True)
-
     print '[{}] Connect to {}'.format(now_str(), DB_NAME)
 
     db = records.Database('postgresql://{}:{}@{}:5432/{}'.format(DB_USER, DB_PASSWORD, DB_HOST, DB_NAME))
