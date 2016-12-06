@@ -1,6 +1,6 @@
 #! /usr/bin/env python
 
-import records
+import psycopg2
 import uuid
 import random
 import string
@@ -9,13 +9,11 @@ import os
 from datetime import datetime
 from subprocess import call
 
-DEVNULL = open(os.devnull, 'wb')
 
 DB_HOST = 'localhost'
 DB_NAME = 'db_performance_test'
 DB_USER = 'postgres'
 DB_PASSWORD = 'postgres'
-ROWS_TO_INSERT = int(sys.argv[1]) if len(sys.argv) > 1 else 10000
 
 
 def log(message=''):
@@ -25,8 +23,9 @@ def log(message=''):
         print ''
 
 
-def test_database():
-    db = None
+def test_database(rows_to_insert=10000):
+    conn, cur = None, None
+
     test_started_at = datetime.now()
 
     log('Create temporary {} database on {}'.format(DB_NAME, DB_HOST))
@@ -37,11 +36,13 @@ def test_database():
     try:
         log('Connect to {}'.format(DB_NAME))
 
-        db = records.Database('postgresql://{}:{}@{}:5432/{}'.format(DB_USER, DB_PASSWORD, DB_HOST, DB_NAME))
+        conn = psycopg2.connect(database=DB_NAME, user=DB_USER, password=DB_PASSWORD, host=DB_HOST, port='5432')
+        conn.autocommit = True
+        cur = conn.cursor()
 
         log('Create table')
 
-        db.query(
+        cur.execute(
             'CREATE TABLE test ('
             'id BIGSERIAL PRIMARY KEY,'
             'title VARCHAR(50) NOT NULL,'
@@ -49,28 +50,30 @@ def test_database():
             'floatvalue DECIMAL(10, 5));'
         )
 
-        db.query('CREATE INDEX ON test ((lower(title)));')
+        cur.execute('CREATE INDEX ON test ((lower(title)));')
 
-        log('Insert {} rows with some random data'.format(ROWS_TO_INSERT))
+        log('Insert {} rows with some random data'.format(rows_to_insert))
 
         insert_started_at = datetime.now()
 
         saved_ids, saved_titles, saved_floatvalues, saved_texts = [], [], [], []
 
-        for i in xrange(ROWS_TO_INSERT):
+        for i in xrange(rows_to_insert):
             title, text = '', ''
             floatvalue = 0.0
 
             if not i % 100:
                 saved_ids.append(i)
-                title = uuid.uuid4()
+                title = str(uuid.uuid4())
                 saved_titles.append(title)
                 floatvalue = round(random.uniform(0, 1000), 5)
                 saved_floatvalues.append(floatvalue)
                 text = str(''.join([random.choice(string.ascii_letters) for _ in xrange(1000)]))
                 saved_texts.append(text[:50])
 
-            db.query('INSERT INTO test (title, text, floatvalue) VALUES (\'{}\', \'{}\', {});'.format(
+            cur.execute(
+                'INSERT INTO test (title, text, floatvalue) VALUES (%s, %s, %s);',
+                (
                     title or str(uuid.uuid4()),
                     text or str(''.join([random.choice(string.ascii_letters) for _ in xrange(1000)])),
                     floatvalue or round(random.uniform(0, 1000), 5)
@@ -83,7 +86,7 @@ def test_database():
 
         select_all_started_at = datetime.now()
 
-        db.query('SELECT * FROM test;')
+        cur.execute('SELECT * FROM test;')
 
         select_all_finished_at = datetime.now()
 
@@ -92,7 +95,7 @@ def test_database():
         select_by_id_started_at = datetime.now()
 
         for id in saved_ids:
-            db.query('SELECT * FROM test WHERE id = {};'.format(id))
+            cur.execute('SELECT * FROM test WHERE id = %s;', (id, ))
 
         select_by_id_finished_at = datetime.now()
 
@@ -101,7 +104,7 @@ def test_database():
         select_by_title_started_at = datetime.now()
 
         for title in saved_titles:
-            db.query('SELECT * FROM test WHERE title = \'{}\';'.format(title))
+            cur.execute('SELECT * FROM test WHERE title = %s;', (title, ))
 
         select_by_title_finished_at = datetime.now()
 
@@ -110,7 +113,7 @@ def test_database():
         select_by_text_started_at = datetime.now()
 
         for text in saved_texts:
-            db.query('SELECT * FROM test WHERE text LIKE \'{}%\';'.format(text))
+            cur.execute('SELECT * FROM test WHERE text LIKE %s;', (text + '%', ))
 
         select_by_text_finished_at = datetime.now()
 
@@ -119,7 +122,7 @@ def test_database():
         select_by_float_started_at = datetime.now()
 
         for floatvalue in saved_floatvalues:
-            db.query('SELECT * FROM test WHERE floatvalue = {};'.format(floatvalue))
+            cur.execute('SELECT * FROM test WHERE floatvalue = %s;', (floatvalue, ))
 
         select_by_float_finished_at = datetime.now()
 
@@ -127,8 +130,8 @@ def test_database():
 
         delete_by_title_started_at = datetime.now()
 
-        for floatvalue in saved_floatvalues:
-            db.query('DELETE FROM test WHERE title = \'{}\';'.format(floatvalue))
+        for title in saved_titles:
+            cur.execute('DELETE FROM test WHERE title = %s;', (title, ))
 
         delete_by_title_finished_at = datetime.now()
         test_finished_at = datetime.now()
@@ -163,11 +166,18 @@ def test_database():
     finally:
         log('Drop temporary {} database from {}'.format(DB_NAME, DB_HOST))
 
-        if db is not None:
-            db.close()
+        cur.close()
+        conn.close()
 
-        call('psql -h {} -U {} -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=\'{}\';"'.format(
-            DB_HOST, DB_USER, DB_NAME), shell=True, stdout=DEVNULL)
+        # Uncomment command below if you see any problem with active connections in dropdb output
+
+        # call(
+        #     'psql -h {} -U {} -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=\'{}\';"'.format(
+        #         DB_HOST, DB_USER, DB_NAME
+        #     ),
+        #     shell=True,
+        #     stdout=open(os.devnull, 'wb')
+        # )
 
         call('dropdb -h {} {}'.format(DB_HOST, DB_NAME), shell=True)
 
@@ -176,4 +186,7 @@ def test_database():
 
 
 if __name__ == '__main__':
-    test_database()
+    if len(sys.argv) > 1:
+        test_database(rows_to_insert=int(sys.argv[1]))
+    else:
+        test_database()
