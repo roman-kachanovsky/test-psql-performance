@@ -179,7 +179,7 @@ def test_database(rows_to_insert=10000):
         #     stdout=open(os.devnull, 'wb')
         # )
 
-        call('dropdb -h {} {}'.format(DB_HOST, DB_NAME), shell=True)
+        call('dropdb -h {} -U {} {}'.format(DB_HOST, DB_USER, DB_NAME), shell=True)
 
         log('Done')
         log()
