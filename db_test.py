@@ -23,7 +23,7 @@ def log(message=''):
         print ''
 
 
-def test_database(rows_to_insert=10000):
+def test_database(rows_to_insert=1000):
     conn, cur = None, None
 
     test_started_at = datetime.now()
@@ -62,7 +62,7 @@ def test_database(rows_to_insert=10000):
             title, text = '', ''
             floatvalue = 0.0
 
-            if not i % 100:
+            if not i % (rows_to_insert / 100):
                 saved_ids.append(i)
                 title = str(uuid.uuid4())
                 saved_titles.append(title)
@@ -164,10 +164,12 @@ def test_database(rows_to_insert=10000):
         ))
         log()
     finally:
-        log('Drop temporary {} database from {}'.format(DB_NAME, DB_HOST))
+        log('Close connection'.format(DB_NAME, DB_HOST))
 
         cur.close()
         conn.close()
+
+        log('Drop temporary {} database from {}'.format(DB_NAME, DB_HOST))
 
         # Uncomment command below if you see any problem with active connections in dropdb output
 
