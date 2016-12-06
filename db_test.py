@@ -84,9 +84,12 @@ def test_database(rows_to_insert=1000):
 
         log('Select all rows')
 
+        number_of_saved_rows = len(saved_ids)
+
         select_all_started_at = datetime.now()
 
-        cur.execute('SELECT * FROM test;')
+        for _ in xrange(number_of_saved_rows):
+            cur.execute('SELECT * FROM test;')
 
         select_all_finished_at = datetime.now()
 
@@ -138,29 +141,29 @@ def test_database(rows_to_insert=1000):
 
         log()
         log('Results:')
-        log('   - Total time: {} seconds'.format(
+        log('   - Total time: {:.3f} seconds'.format(
             (test_finished_at - test_started_at).total_seconds()
         ))
-        log('   - Insert operations: {} seconds'.format(
-            (insert_finished_at - insert_started_at).total_seconds()
+        log('   - Insert operations (avg): {:.3f} ms'.format(
+            (insert_finished_at - insert_started_at).total_seconds() / rows_to_insert * 1000
         ))
-        log('   - Select all: {} seconds'.format(
-            (select_all_finished_at - select_all_started_at).total_seconds()
+        log('   - Select all (avg): {:.3f} ms'.format(
+            (select_all_finished_at - select_all_started_at).total_seconds() / number_of_saved_rows * 1000
         ))
-        log('   - Select by id: {} seconds'.format(
-            (select_by_id_finished_at - select_by_id_started_at).total_seconds()
+        log('   - Select by id (avg): {:.3f} ms'.format(
+            (select_by_id_finished_at - select_by_id_started_at).total_seconds() / number_of_saved_rows * 1000
         ))
-        log('   - Select by title (indexed): {} seconds'.format(
-            (select_by_title_finished_at - select_by_title_started_at).total_seconds()
+        log('   - Select by title (indexed text, avg): {:.3f} ms'.format(
+            (select_by_title_finished_at - select_by_title_started_at).total_seconds() / number_of_saved_rows * 1000
         ))
-        log('   - Select by text (non-indexed, cutted): {} seconds'.format(
-            (select_by_text_finished_at - select_by_text_started_at).total_seconds()
+        log('   - Select by text (non-indexed text, partial search, avg): {:.3f} ms'.format(
+            (select_by_text_finished_at - select_by_text_started_at).total_seconds() / number_of_saved_rows * 1000
         ))
-        log('   - Select by float: {} seconds'.format(
-            (select_by_float_finished_at - select_by_float_started_at).total_seconds()
+        log('   - Select by float (avg): {:.3f} ms'.format(
+            (select_by_float_finished_at - select_by_float_started_at).total_seconds() / number_of_saved_rows * 1000
         ))
-        log('   - Delete rows by title: {} seconds'.format(
-            (delete_by_title_finished_at - delete_by_title_started_at).total_seconds()
+        log('   - Delete rows by title (avg): {:.3f} ms'.format(
+            (delete_by_title_finished_at - delete_by_title_started_at).total_seconds() / number_of_saved_rows * 1000
         ))
         log()
     finally:
